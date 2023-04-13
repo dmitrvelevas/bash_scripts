@@ -1,0 +1,37 @@
+#!/bin/bash
+
+#Проверяем наличие файла лицензии
+[ -z "$(ls -A /var/hasplm/installed/6673)" ] && cp ${hasp_license_location}/license*.v2c /var/hasplm/installed/6673
+
+#Запускаем hasplmd_x86_64 в фоновом режиме
+hasplmd_x86_64 -u root
+
+#Проверяем наличие конфигурационных файлов для сервера и агента
+if [ -z "$(ls -A /etc/Magic)" ]  
+then
+    #Восстанавливаемся из резервной копии
+    cp ${server_config_location}/*.xml /etc/Magic
+	while [ -n "$1" ]
+	do
+		case "$1" in
+			--reserve-server=*) 
+				RESERVE_HOST=$(echo $1 | sed "s/.*=\(.*\)/\1/")
+				sed -i "s/<local_ip>127.0.0.1<\/local_ip>/<local_ip>$(hostname -I)<\/local_ip>/" /etc/Magic/MagicAgent.xml
+				sed -i "s/<ip>.*<\/ip>/<ip>$RESERVE_HOST<\/ip>/" /etc/Magic/MagicAgent.xml
+				sed -i "s/<host>.*<\/host>/<host>$(hostname -I)<\/host>/" /etc/Magic/MagicAgent.xml
+				shift
+				;;
+			--firebird-server=*)
+				FIREBIRD_SERVER=$(echo $1 | sed "s/.*=\(.*\)/\1/")
+				sed -i "s/<host>firebird<\/host>/<host>$FIREBIRD_SERVER<\/host>/" /etc/Magic/MagicServer.xml
+				shift 
+				;;
+			*) 
+				exit 1 
+				;;
+		esac
+	done
+fi
+
+#Запускаем агента
+MagicAgent
